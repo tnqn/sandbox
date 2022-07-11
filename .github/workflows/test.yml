@@ -1,0 +1,67 @@
+name: Test
+on:
+  pull_request:
+    branches:
+      - main
+      - release-*
+  push:
+    branches:
+      - main
+      - release-*
+
+env:
+  KIND_VERSION: v0.12.0
+
+jobs:
+  build-artifact:
+    name: Build artifact to be used for tests
+    runs-on: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build artifact
+        run: |
+          echo test > testfile
+      - name: Upload artifact for subsequent jobs
+        uses: actions/upload-artifact@v3
+        with:
+          name: testname
+          path: testfile
+          retention-days: 1
+
+  test-success:
+    name: E2e tests that succeeds
+    needs: [build-artifact]
+    runs-on: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Download artifact from previous jobs
+        uses: actions/download-artifact@v3
+      - name: Run tests
+        run: |
+          cat testname/testfile
+
+  test-random:
+    name: E2e tests that fails
+    needs: [build-artifact]
+    runs-on: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Download artifact from previous jobs
+        uses: actions/download-artifact@v3
+      - name: Run tests
+        run: |
+          cat testname/testfile
+          exit $((RANDOM % 2))
+
+  artifact-cleanup:
+    name: Delete artifact
+    needs:
+      - build-artifact
+      - test-success
+      - test-random
+    runs-on: [ubuntu-latest]
+    steps:
+      - name: Delete artifact
+        uses: geekyeggo/delete-artifact@v1
+        with:
+          name: testname
